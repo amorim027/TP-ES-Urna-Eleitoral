@@ -1,0 +1,16 @@
+services:
+  urna:
+    build: .
+    image: urna-eleitoral:local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      URNA_SENHA: ${URNA_SENHA:-123456}
+      URNA_DADOS_DIR: /app/data
+    volumes:
+      - dados-urna:/app/data
+
+volumes:
+  dados-urna:

@@ -1,0 +1,7 @@
+target/
+data/urna.db
+*.tmp
+.env
+.docker-cli-config/
+.idea/
+.vscode/
