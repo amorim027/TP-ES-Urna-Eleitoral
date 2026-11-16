@@ -6,3 +6,4 @@
 target
 *.tmp
 data/urna.db
+docs

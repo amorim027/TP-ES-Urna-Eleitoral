@@ -24,15 +24,24 @@ import java.util.concurrent.Executors;
 /** Interface web simples para operação local e demonstração em sala. */
 public final class ServidorHttp {
     private final ServicoUrna urna;
+    private HttpServer server;
 
     public ServidorHttp(ServicoUrna urna) { this.urna = urna; }
 
     public void iniciar(int porta) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", porta), 0);
+        server = HttpServer.create(new InetSocketAddress("0.0.0.0", porta), 0);
         server.createContext("/", this::atender);
         server.setExecutor(Executors.newFixedThreadPool(8));
         server.start();
-        System.out.println("Urna pronta em http://localhost:" + porta);
+        System.out.println("Urna pronta em http://localhost:" + server.getAddress().getPort());
+    }
+
+    public int porta() {
+        return server == null ? -1 : server.getAddress().getPort();
+    }
+
+    public void parar() {
+        if (server != null) server.stop(0);
     }
 
     private void atender(HttpExchange exchange) throws IOException {
@@ -122,7 +131,7 @@ public final class ServidorHttp {
 
     private void campoEscolha(StringBuilder html, String campo, String descricao, String valor, List<Candidato> candidatos) {
         html.append("<label>").append(esc(descricao)).append("<input name='").append(campo).append("' value='").append(esc(valor == null ? "" : valor))
-                .append("' inputmode='numeric' autocomplete='off' required></label><div class='hint'>");
+                .append("' autocomplete='off' required></label><div class='hint'>");
         for (Candidato c : candidatos) html.append("<span>").append(c.numero()).append(" — ").append(esc(c.nome())).append("</span>");
         html.append("<span>BRANCO</span><span>NULO</span></div>");
     }
@@ -141,6 +150,10 @@ public final class ServidorHttp {
             validarParaExibicao(presidente, Cargo.PRESIDENTE);
             validarParaExibicao(deputado1, Cargo.DEPUTADO_FEDERAL);
             validarParaExibicao(deputado2, Cargo.DEPUTADO_FEDERAL);
+            if (deputado1.tipo() == TipoVoto.NOMINAL && deputado2.tipo() == TipoVoto.NOMINAL
+                    && java.util.Objects.equals(deputado1.numeroCandidato(), deputado2.numeroCandidato())) {
+                throw new RecursoInvalidoException("Escolha dois candidatos distintos para Deputado federal.");
+            }
             StringBuilder corpo = new StringBuilder("<section class='card'><p class='eyebrow'>REVISE SUA CÉDULA</p><h2>Confirme suas escolhas</h2><p>Eleitor: <strong>").append(esc(eleitor.nome())).append("</strong></p><dl>");
             linhaEscolha(corpo, "Presidente", presidente, Cargo.PRESIDENTE);
             linhaEscolha(corpo, "Deputado federal — vaga 1", deputado1, Cargo.DEPUTADO_FEDERAL);

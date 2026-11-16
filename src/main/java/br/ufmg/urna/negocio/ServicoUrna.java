@@ -70,6 +70,10 @@ public final class ServicoUrna {
         validarEscolha(presidente, Cargo.PRESIDENTE);
         validarEscolha(deputado1, Cargo.DEPUTADO_FEDERAL);
         validarEscolha(deputado2, Cargo.DEPUTADO_FEDERAL);
+        if (deputado1.tipo() == TipoVoto.NOMINAL && deputado2.tipo() == TipoVoto.NOMINAL
+                && Objects.equals(deputado1.numeroCandidato(), deputado2.numeroCandidato())) {
+            throw new RecursoInvalidoException("Escolha dois candidatos distintos para Deputado federal.");
+        }
         alterar(d -> {
             d.eleitores().put(eleitor.titulo(), eleitor.comParticipacao());
             d.cedulas().add(List.of(presidente, deputado1, deputado2));
@@ -79,6 +83,7 @@ public final class ServicoUrna {
     public synchronized BoletimUrna apurar() {
         exigirEstado(EstadoUrna.ENCERRADA);
         Map<Candidato, Integer> totais = new LinkedHashMap<>();
+        Map<Cargo, Integer> validosPorCargo = new LinkedHashMap<>();
         dados.candidatos().forEach(c -> totais.put(c, 0));
         int brancos = 0, nulos = 0, validos = 0;
         for (List<Escolha> cedula : dados.cedulas()) {
@@ -91,14 +96,17 @@ public final class ServicoUrna {
                     Candidato candidato = procurar(escolha.numeroCandidato(), cargo);
                     if (candidato != null) {
                         totais.merge(candidato, 1, Integer::sum);
+                        validosPorCargo.merge(cargo, 1, Integer::sum);
                         validos++;
                     }
                 }
             }
         }
         Map<Candidato, Double> percentuais = new LinkedHashMap<>();
-        int denominador = validos;
-        totais.forEach((c, n) -> percentuais.put(c, denominador == 0 ? 0.0 : n * 100.0 / denominador));
+        totais.forEach((c, n) -> {
+            int denominador = validosPorCargo.getOrDefault(c.cargo(), 0);
+            percentuais.put(c, denominador == 0 ? 0.0 : n * 100.0 / denominador);
+        });
         List<Candidato> eleitos = new ArrayList<>();
         if (validos > 0) {
             escolher(dados.candidatos(), Cargo.PRESIDENTE, totais, 1).forEach(eleitos::add);
