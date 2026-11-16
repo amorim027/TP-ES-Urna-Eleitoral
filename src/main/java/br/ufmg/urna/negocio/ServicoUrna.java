@@ -35,7 +35,13 @@ public final class ServicoUrna {
     public synchronized List<Candidato> candidatos(Cargo cargo) {
         return dados.candidatos().stream().filter(c -> c.cargo() == cargo).sorted(Comparator.comparingInt(Candidato::numero)).toList();
     }
+    public synchronized List<Eleitor> eleitores() {
+        return dados.eleitores().values().stream().sorted(Comparator.comparing(Eleitor::titulo)).toList();
+    }
     public synchronized int eleitoresAptos() { return dados.eleitores().size(); }
+    public synchronized int comparecimentos() {
+        return (int) dados.eleitores().values().stream().filter(Eleitor::participou).count();
+    }
 
     public synchronized void abrir(String senhaDigitada) {
         if (!senha.equals(senhaDigitada)) throw new RecursoInvalidoException("Senha incorreta.");
@@ -47,6 +53,15 @@ public final class ServicoUrna {
         if (!senha.equals(senhaDigitada)) throw new RecursoInvalidoException("Senha incorreta.");
         if (dados.estado() != EstadoUrna.ABERTA) throw new RecursoInvalidoException("A urna não está aberta.");
         alterar(d -> d.estado(EstadoUrna.ENCERRADA));
+    }
+
+    public synchronized void reiniciar(String senhaDigitada) {
+        if (!senha.equals(senhaDigitada)) throw new RecursoInvalidoException("Senha incorreta.");
+        try {
+            this.dados = repositorio.recarregarInicial();
+        } catch (IOException e) {
+            throw new IllegalStateException("Não foi possível reiniciar a urna.", e);
+        }
     }
 
     public synchronized Eleitor identificar(String titulo) {

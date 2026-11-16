@@ -39,6 +39,7 @@ class ServidorHttpTest {
             private DadosUrna dados = iniciais;
             @Override public DadosUrna carregar() { return dados.copia(); }
             @Override public void salvar(DadosUrna novos) { dados = novos.copia(); }
+            @Override public DadosUrna recarregarInicial() { dados = iniciais.copia(); return dados.copia(); }
         }, "123456");
 
         servidor = new ServidorHttp(urna);
@@ -72,10 +73,10 @@ class ServidorHttpTest {
         assertTrue(conferirValido.body().contains("Alex Silva (10)"));
 
         HttpResponse<String> confirmar = post("/confirmar", "titulo=1001&presidente=10&deputado1=101&deputado2=102");
-        assertTrue(confirmar.body().contains("Voto confirmado e registrado."));
+        assertTrue(confirmar.body().contains("Voto confirmado e registrado"));
 
         HttpResponse<String> abster = post("/abster", "titulo=1002");
-        assertTrue(abster.body().contains("Abstenção registrada."));
+        assertTrue(abster.body().contains("Abstenção registrada"));
 
         HttpResponse<String> encerrar = post("/encerrar", "senha=123456");
         assertTrue(encerrar.body().contains("ENCERRADA"));
@@ -85,6 +86,13 @@ class ServidorHttpTest {
         assertTrue(boletim.body().contains("BOLETIM DE URNA"));
         assertTrue(boletim.body().contains("100,00%"));
         assertTrue(boletim.body().contains("50,00%"));
+
+        HttpResponse<String> health = get("/healthz");
+        assertEquals(200, health.statusCode());
+        assertEquals("OK", health.body());
+
+        HttpResponse<String> reiniciar = post("/reiniciar", "senha=123456");
+        assertTrue(reiniciar.body().contains("FECHADA"));
 
         HttpResponse<String> naoEncontrado = get("/rota-inexistente");
         assertEquals(404, naoEncontrado.statusCode());
