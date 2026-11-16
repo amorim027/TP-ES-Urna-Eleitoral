@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: tp-es-urna-eleitoral
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: URNA_SENHA
+        value: "123456"
+      - key: URNA_DADOS_DIR
+        value: "/app/data"
