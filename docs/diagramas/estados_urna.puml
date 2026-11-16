@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+[*] --> FECHADA : Carga inicial dos CSVs\n(eleitores.csv e candidatos.csv)
+
+state FECHADA {
+    FECHADA : Votação bloqueada
+    FECHADA : Apuração bloqueada
+    FECHADA : Aguarda abertura pelo Mesário
+}
+
+state ABERTA {
+    [*] --> AguardandoEleitor
+    AguardandoEleitor --> EleitorIdentificado : identificar(titulo válido\ne ainda não participante)
+    EleitorIdentificado --> PreenchendoCedula : confirmar identidade
+    EleitorIdentificado --> ParticipacaoConcluida : registrarAbstencao(titulo)
+    PreenchendoCedula --> RevisandoCedula : conferir(escolhas válidas\ne deputados distintos)
+    RevisandoCedula --> PreenchendoCedula : editar escolhas
+    RevisandoCedula --> ParticipacaoConcluida : confirmar -> registrarVoto()
+    ParticipacaoConcluida --> AguardandoEleitor : Cédula anônima gravada em urna.db
+}
+
+state ENCERRADA {
+    ENCERRADA : Votação bloqueada definitivamente
+    ENCERRADA : Permite chamar apurar() e emitir BoletimUrna
+}
+
+FECHADA --> ABERTA : abrir(senha válida)
+ABERTA --> ENCERRADA : encerrar(senha válida)
+ENCERRADA --> [*] : Emissão do Boletim de Urna
+@enduml

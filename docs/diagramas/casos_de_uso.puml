@@ -1,0 +1,32 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+actor "Mesário\n(Credenciado TSE)" as Mesario
+actor "Eleitor" as Eleitor
+
+rectangle "Sistema de Urna Eletrônica" {
+    usecase "UC01 - Abrir Votação\n(com senha)" as UC01
+    usecase "UC02 - Identificar Eleitor\n(pelo título)" as UC02
+    usecase "UC03 - Registrar Voto\n(1 Presidente e 2 Deputados)" as UC03
+    usecase "UC04 - Conferir e Corrigir\nCédula Eletrônica" as UC04
+    usecase "UC05 - Registrar Abstenção" as UC05
+    usecase "UC06 - Encerrar Votação\n(com senha)" as UC06
+    usecase "UC07 - Emitir Boletim de Urna\n(Apuração e Estatísticas)" as UC07
+}
+
+Mesario --> UC01
+Mesario --> UC06
+Mesario --> UC07
+
+Eleitor --> UC02
+Eleitor --> UC03
+Eleitor --> UC05
+
+UC03 ..> UC02 : <<include>>
+UC03 ..> UC04 : <<include>>
+UC05 ..> UC02 : <<include>>
+UC07 ..> UC06 : <<include>>
+@enduml
