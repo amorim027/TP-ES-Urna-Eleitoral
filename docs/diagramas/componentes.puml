@@ -1,0 +1,43 @@
+@startuml
+top to bottom direction
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodesep 35
+skinparam ranksep 40
+
+package "Camada de Apresentação (br.ufmg.urna.ui)" {
+    [ServidorHttp] as UI
+}
+
+package "Camada de Negócio (br.ufmg.urna.negocio)" {
+    [ServicoUrna] as Negocio
+}
+
+package "Modelo de Domínio (br.ufmg.urna)" {
+    [Records e Enums de Domínio\n(Eleitor, Candidato, Escolha, BoletimUrna,\nCargo, EstadoUrna, TipoVoto)] as Dominio
+}
+
+package "Camada de Persistência / Dados (br.ufmg.urna.dados)" {
+    interface "RepositorioUrna" as IRepo
+    [RepositorioArquivo] as RepoArq
+    [DadosUrna] as EstadoMem
+}
+
+database "Armazenamento Local (/app/data)" {
+    artifact "eleitores.csv" as CSVEleitores
+    artifact "candidatos.csv" as CSVCandidatos
+    artifact "urna.db (Atômico)" as UrnaDB
+}
+
+UI -down-> Negocio : delega operações
+UI .right.> Dominio : lê records
+Negocio -right-> Dominio : valida e apura
+Negocio -down-> IRepo : carregar() / salvar()
+Negocio -down-> EstadoMem : manipula cópia
+RepoArq .up.|> IRepo : implementa
+RepoArq -right-> EstadoMem : serializa
+RepoArq -down-> CSVEleitores : lê carga inicial
+RepoArq -down-> CSVCandidatos : lê carga inicial
+RepoArq -down-> UrnaDB : gravação atômica
+@enduml

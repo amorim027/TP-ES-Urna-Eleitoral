@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+autonumber
+
+actor Eleitor
+participant "ServidorHttp\n(UI Web)" as UI
+participant "ServicoUrna\n(Negócio)" as Servico
+participant "DadosUrna\n(Memória)" as Dados
+participant "RepositorioArquivo\n(Persistência)" as Repo
+
+Eleitor -> UI : POST /identificar (titulo)
+UI -> Servico : identificar(titulo)
+Servico -> Dados : buscar eleitor e checar !participou()
+Dados --> Servico : Eleitor(titulo, nome, participou=false)
+Servico --> UI : Eleitor
+UI --> Eleitor : Exibe nome do eleitor para confirmação
+
+Eleitor -> UI : POST /iniciar-voto (titulo)
+UI -> Servico : candidatos(PRESIDENTE / DEPUTADO_FEDERAL)
+Servico --> UI : Lista de candidatos
+UI --> Eleitor : Formulário da cédula eletrônica
+
+Eleitor -> UI : POST /conferir (presidente, deputado1, deputado2)
+UI -> Servico : identificar(titulo) e validar escolhas
+Servico --> UI : Dados válidos e distintos
+UI --> Eleitor : Tela de revisão da cédula (Confirmar ou Corrigir)
+
+Eleitor -> UI : POST /confirmar (titulo, presidente, deputado1, deputado2)
+UI -> Servico : registrarVoto(titulo, presidente, deputado1, deputado2)
+Servico -> Dados : copia()
+Servico -> Dados : marcar eleitor comParticipacao()
+Servico -> Dados : adicionar cédula anônima List<Escolha>
+Servico -> Repo : salvar(novoDados)
+Repo -> Repo : gravar temporário e substituir urna.db (ATOMIC_MOVE)
+Repo --> Servico : OK
+Servico --> UI : Voto registrado com sucesso
+UI --> Eleitor : Mensagem de confirmação
+@enduml

@@ -1,0 +1,154 @@
+@startuml
+top to bottom direction
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam nodesep 25
+skinparam ranksep 30
+
+package "br.ufmg.urna.ui" {
+    class ServidorHttp {
+        - urna: ServicoUrna
+        - server: HttpServer
+        + iniciar(porta: int): void
+        + porta(): int
+        + parar(): void
+    }
+}
+
+package "br.ufmg.urna.negocio" {
+    class ServicoUrna {
+        - repositorio: RepositorioUrna
+        - senha: String
+        - dados: DadosUrna
+        - eleitorLiberado: Eleitor
+        + estado(): EstadoUrna
+        + candidatos(cargo: Cargo): List<Candidato>
+        + eleitores(): List<Eleitor>
+        + eleitoresAptos(): int
+        + eleitorLiberado(): Eleitor
+        + abrir(senhaDigitada: String): void
+        + encerrar(senhaDigitada: String): void
+        + reiniciar(): void
+        + liberarEleitor(titulo: String): Eleitor
+        + cancelarLiberacao(): void
+        + identificar(titulo: String): Eleitor
+        + registrarAbstencao(titulo: String): void
+        + registrarVoto(titulo: String, pres: Escolha, dep1: Escolha, dep2: Escolha): void
+        + apurar(): BoletimUrna
+    }
+}
+
+package "br.ufmg.urna.dados" {
+    interface RepositorioUrna {
+        + carregar(): DadosUrna
+        + salvar(dados: DadosUrna): void
+        + recarregarInicial(): DadosUrna
+    }
+
+    class RepositorioArquivo {
+        - arquivo: Path
+        - eleitoresCsv: Path
+        - candidatosCsv: Path
+        + carregar(): DadosUrna
+        + salvar(dados: DadosUrna): void
+        + recarregarInicial(): DadosUrna
+    }
+
+    class DadosUrna {
+        - estado: EstadoUrna
+        - eleitores: Map<String, Eleitor>
+        - candidatos: List<Candidato>
+        - cedulas: List<List<Escolha>>
+        - abstencoes: int
+        + estado(): EstadoUrna
+        + estado(estado: EstadoUrna): void
+        + eleitores(): Map<String, Eleitor>
+        + candidatos(): List<Candidato>
+        + cedulas(): List<List<Escolha>>
+        + abstencoes(): int
+        + registrarAbstencao(): void
+        + copia(): DadosUrna
+    }
+}
+
+package "br.ufmg.urna" {
+    class UrnaApplication {
+        + {static} main(args: String[]): void
+    }
+
+    class BoletimUrna <<record>> {
+        + eleitoresAptos: int
+        + comparecimentos: int
+        + abstencoes: int
+        + votosValidos: int
+        + votosBrancos: int
+        + votosNulos: int
+        + votosPorCandidato: Map<Candidato, Integer>
+        + percentualPorCandidato: Map<Candidato, Double>
+        + eleitos: List<Candidato>
+        + derrotados: List<Candidato>
+        + houveVotosValidos: boolean
+    }
+
+    class Candidato <<record>> {
+        + cargo: Cargo
+        + numero: int
+        + nome: String
+    }
+
+    class Eleitor <<record>> {
+        + titulo: String
+        + nome: String
+        + participou: boolean
+        + comParticipacao(): Eleitor
+    }
+
+    class Escolha <<record>> {
+        + tipo: TipoVoto
+        + numeroCandidato: Integer
+        + {static} nominal(numero: int): Escolha
+        + {static} branco(): Escolha
+        + {static} nulo(): Escolha
+    }
+
+    enum Cargo {
+        PRESIDENTE
+        DEPUTADO_FEDERAL
+        + descricao(): String
+    }
+
+    enum EstadoUrna {
+        FECHADA
+        ABERTA
+        ENCERRADA
+    }
+
+    enum TipoVoto {
+        NOMINAL
+        BRANCO
+        NULO
+    }
+
+    class RecursoInvalidoException {
+        + RecursoInvalidoException(msg: String)
+    }
+}
+
+UrnaApplication ..> ServidorHttp
+UrnaApplication ..> ServicoUrna
+UrnaApplication ..> RepositorioArquivo
+ServidorHttp --> ServicoUrna
+ServicoUrna --> RepositorioUrna
+ServicoUrna *-- DadosUrna
+ServicoUrna ..> BoletimUrna
+ServicoUrna ..> RecursoInvalidoException
+RepositorioArquivo .up.|> RepositorioUrna
+RepositorioArquivo ..> DadosUrna
+DadosUrna --> EstadoUrna
+DadosUrna *-- Eleitor
+DadosUrna *-- Candidato
+DadosUrna *-- Escolha
+Candidato --> Cargo
+Escolha --> TipoVoto
+@enduml
