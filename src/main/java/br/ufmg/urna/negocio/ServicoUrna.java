@@ -23,6 +23,7 @@ public final class ServicoUrna {
     private final RepositorioUrna repositorio;
     private final String senha;
     private DadosUrna dados;
+    private Eleitor eleitorLiberado;
 
     public ServicoUrna(RepositorioUrna repositorio, String senha) throws IOException {
         this.repositorio = Objects.requireNonNull(repositorio);
@@ -34,6 +35,9 @@ public final class ServicoUrna {
     public synchronized EstadoUrna estado() { return dados.estado(); }
     public synchronized List<Candidato> candidatos(Cargo cargo) {
         return dados.candidatos().stream().filter(c -> c.cargo() == cargo).sorted(Comparator.comparingInt(Candidato::numero)).toList();
+    }
+    public synchronized List<Eleitor> eleitores() {
+        return dados.eleitores().values().stream().sorted(Comparator.comparing(Eleitor::titulo)).toList();
     }
     public synchronized int eleitoresAptos() { return dados.eleitores().size(); }
 
@@ -47,6 +51,33 @@ public final class ServicoUrna {
         if (!senha.equals(senhaDigitada)) throw new RecursoInvalidoException("Senha incorreta.");
         if (dados.estado() != EstadoUrna.ABERTA) throw new RecursoInvalidoException("A urna não está aberta.");
         alterar(d -> d.estado(EstadoUrna.ENCERRADA));
+        this.eleitorLiberado = null;
+    }
+
+    public synchronized void reiniciar() {
+        try {
+            this.dados = repositorio.recarregarInicial();
+            this.eleitorLiberado = null;
+        } catch (IOException e) {
+            throw new IllegalStateException("Não foi possível reiniciar a urna.", e);
+        }
+    }
+
+    public synchronized Eleitor eleitorLiberado() {
+        return dados.estado() == EstadoUrna.ABERTA ? eleitorLiberado : null;
+    }
+
+    public synchronized Eleitor liberarEleitor(String titulo) {
+        Eleitor eleitor = identificar(titulo);
+        if (eleitorLiberado != null && !eleitorLiberado.titulo().equals(eleitor.titulo())) {
+            throw new RecursoInvalidoException("Cabina ocupada por " + eleitorLiberado.nome() + ".");
+        }
+        this.eleitorLiberado = eleitor;
+        return eleitor;
+    }
+
+    public synchronized void cancelarLiberacao() {
+        this.eleitorLiberado = null;
     }
 
     public synchronized Eleitor identificar(String titulo) {
@@ -63,22 +94,33 @@ public final class ServicoUrna {
             d.eleitores().put(eleitor.titulo(), eleitor.comParticipacao());
             d.registrarAbstencao();
         });
+        if (eleitorLiberado != null && eleitorLiberado.titulo().equals(eleitor.titulo())) {
+            eleitorLiberado = null;
+        }
     }
 
     public synchronized void registrarVoto(String titulo, Escolha presidente, Escolha deputado1, Escolha deputado2) {
         Eleitor eleitor = identificar(titulo);
-        validarEscolha(presidente, Cargo.PRESIDENTE);
-        validarEscolha(deputado1, Cargo.DEPUTADO_FEDERAL);
-        validarEscolha(deputado2, Cargo.DEPUTADO_FEDERAL);
+        Escolha presFinal = normalizarEscolha(presidente, Cargo.PRESIDENTE);
+        Escolha dep1Final = normalizarEscolha(deputado1, Cargo.DEPUTADO_FEDERAL);
+        Escolha dep2Final = normalizarEscolha(deputado2, Cargo.DEPUTADO_FEDERAL);
+        if (dep1Final.tipo() == TipoVoto.NOMINAL && dep2Final.tipo() == TipoVoto.NOMINAL
+                && Objects.equals(dep1Final.numeroCandidato(), dep2Final.numeroCandidato())) {
+            throw new RecursoInvalidoException("Escolha dois candidatos distintos para Deputado federal.");
+        }
         alterar(d -> {
             d.eleitores().put(eleitor.titulo(), eleitor.comParticipacao());
-            d.cedulas().add(List.of(presidente, deputado1, deputado2));
+            d.cedulas().add(List.of(presFinal, dep1Final, dep2Final));
         });
+        if (eleitorLiberado != null && eleitorLiberado.titulo().equals(eleitor.titulo())) {
+            eleitorLiberado = null;
+        }
     }
 
     public synchronized BoletimUrna apurar() {
         exigirEstado(EstadoUrna.ENCERRADA);
         Map<Candidato, Integer> totais = new LinkedHashMap<>();
+        Map<Cargo, Integer> validosPorCargo = new LinkedHashMap<>();
         dados.candidatos().forEach(c -> totais.put(c, 0));
         int brancos = 0, nulos = 0, validos = 0;
         for (List<Escolha> cedula : dados.cedulas()) {
@@ -91,14 +133,17 @@ public final class ServicoUrna {
                     Candidato candidato = procurar(escolha.numeroCandidato(), cargo);
                     if (candidato != null) {
                         totais.merge(candidato, 1, Integer::sum);
+                        validosPorCargo.merge(cargo, 1, Integer::sum);
                         validos++;
                     }
                 }
             }
         }
         Map<Candidato, Double> percentuais = new LinkedHashMap<>();
-        int denominador = validos;
-        totais.forEach((c, n) -> percentuais.put(c, denominador == 0 ? 0.0 : n * 100.0 / denominador));
+        totais.forEach((c, n) -> {
+            int denominador = validosPorCargo.getOrDefault(c.cargo(), 0);
+            percentuais.put(c, denominador == 0 ? 0.0 : n * 100.0 / denominador);
+        });
         List<Candidato> eleitos = new ArrayList<>();
         if (validos > 0) {
             escolher(dados.candidatos(), Cargo.PRESIDENTE, totais, 1).forEach(eleitos::add);
@@ -123,14 +168,18 @@ public final class ServicoUrna {
         return dados.candidatos().stream().filter(c -> c.cargo() == cargo && Objects.equals(c.numero(), numero)).findFirst().orElse(null);
     }
 
-    private void validarEscolha(Escolha escolha, Cargo cargo) {
+    private Escolha normalizarEscolha(Escolha escolha, Cargo cargo) {
         if (escolha == null || escolha.tipo() == null) throw new RecursoInvalidoException("Escolha de voto ausente.");
         if (escolha.tipo() == TipoVoto.NOMINAL) {
+            if (escolha.numeroCandidato() == null || escolha.numeroCandidato() < 0) {
+                throw new RecursoInvalidoException("Número inválido para " + cargo.descricao() + ".");
+            }
             boolean existe = dados.candidatos().stream().anyMatch(c -> c.cargo() == cargo && Objects.equals(c.numero(), escolha.numeroCandidato()));
-            if (!existe) throw new RecursoInvalidoException("Número inválido para " + cargo.descricao() + ". Corrija antes de confirmar.");
+            return existe ? escolha : Escolha.nulo();
         } else if (escolha.numeroCandidato() != null) {
             throw new RecursoInvalidoException("Voto branco ou nulo não pode conter número de candidato.");
         }
+        return escolha;
     }
 
     private void exigirEstado(EstadoUrna esperado) {

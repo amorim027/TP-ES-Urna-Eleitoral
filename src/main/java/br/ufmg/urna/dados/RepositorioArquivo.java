@@ -35,6 +35,11 @@ public final class RepositorioArquivo implements RepositorioUrna {
     @Override
     public synchronized DadosUrna carregar() throws IOException {
         if (Files.exists(arquivo)) return lerArquivo();
+        return recarregarInicial();
+    }
+
+    @Override
+    public synchronized DadosUrna recarregarInicial() throws IOException {
         DadosUrna dados = carregarCargaInicial();
         salvar(dados);
         return dados;

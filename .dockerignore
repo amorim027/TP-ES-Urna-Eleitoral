@@ -6,3 +6,8 @@
 target
 *.tmp
 data/urna.db
+docs
+.github
+AGENTS.md
+CONTRIBUTING.md
+render.yaml
