@@ -1,72 +1,75 @@
 # Sistema de Urna Eletrônica
 
-Aplicação web local para a simulação acadêmica de uma eleição de turno único. O sistema usa Java 17, Maven e JUnit 5. A interface abre no navegador e atende ao fluxo de mesário e eleitor.
+Simulador web de urna eletrônica para eleição de turno único (Presidente e Deputado Federal), desenvolvido para a disciplina DCC603 (Engenharia de Software I) da UFMG.
 
-## Executar localmente
+- **Aplicação online (Render):** https://urna-eleitoral.onrender.com (Senha mesário: 123456)
+- **Execução local (Docker):** `docker compose up --build -d` em http://localhost:8080
 
-Requisitos: Docker Engine, Docker Compose v2 e acesso à internet na primeira compilação para baixar as imagens e dependências. No Windows ou macOS, pode-se usar Docker Desktop; no Linux, Docker Engine com o plugin Docker Compose. Não é necessário instalar Java ou Maven no computador: o Dockerfile compila o projeto com Java 17 e executa os testes durante a criação da imagem.
+## Grupo 2
 
-No Linux, a conta precisa ter permissão para acessar o Docker Engine. Se os comandos retornarem erro de permissão, use `sudo` antes de `docker compose` ou configure o acesso do seu usuário ao Docker. Antes de iniciar, confirme que `docker version` mostra as seções Client e Server e que `docker compose version` mostra a versão do Compose.
+- Davi Ladeira Balsamão
+- Ítalo Leal Lana Santos
+- Thiago Amorim Bastos
+- Vitor Hugo Dias Santos
 
-```text
-docker version
-docker compose version
-```
+## Documentação (`docs/`)
 
-Na raiz do projeto, execute:
+- [Documentação Completa (Sprints 1, 2 e 3)](./docs/Documentacao_Completa_TP_Urna_Eletronica.pdf)
+- [Sprint 1: Planejamento e Requisitos](./docs/Sprint1_Planejamento_e_Requisitos.pdf)
+- [Sprint 2: Casos de Uso, Arquitetura e Modelagem](./docs/Sprint2_CasosDeUso_Arquitetura_Modelagem.pdf)
+- [Sprint 3: Implementação e Testes](./docs/Sprint3_Implementacao_e_Testes.pdf)
+- [Slides da Apresentação Final](./docs/Apresentacao_Final_Sprint3_Urna_Eletronica.pdf)
+- [Diagramas UML (`.puml` e `.png`)](./docs/diagramas/)
+- [Especificação do TP (`docs/especificacao/`)](./docs/especificacao/)
 
-```text
+## Como executar localmente
+
+Com Docker e Docker Compose instalados:
+
+```bash
 docker compose up --build -d
 ```
 
-Abra [http://localhost:8080](http://localhost:8080). Na primeira execução, a urna importa os arquivos CSV de exemplo em `data/` e cria `urna.db` em `/app/data`, dentro do volume Docker `dados-urna`.
+Acesse `http://localhost:8080` (Senha mesário: 123456). Para encerrar mantendo os dados, use `docker compose down`. Para zerar os dados do volume, use `docker compose down -v`.
 
-Se a porta 8080 já estiver ocupada, altere o lado esquerdo do mapeamento `8080:8080` no `compose.yaml`, por exemplo para `8081:8080`, e abra `http://localhost:8081`.
+Sem Docker (com Java 17 e Maven):
 
-A senha inicial de demonstração é `123456`. Para trocar, crie um arquivo `.env` na raiz com `URNA_SENHA=sua-senha` antes de executar o Compose.
-
-```text
-docker compose logs -f
+```bash
+mvn test
+mvn package
+java -jar target/urna-eleitoral-1.0.0.jar
 ```
 
-Esse comando acompanha os logs de inicialização. Para encerrar a aplicação sem apagar os dados, use `docker compose down`. Para iniciá-la novamente, use `docker compose up -d`.
+## Dados de entrada (`data/`)
 
-Para zerar a urna e apagar votos/participação gravados, execute `docker compose down -v`; na próxima inicialização, os dados de demonstração serão carregados de novo. Essa operação apaga permanentemente os dados persistidos no volume.
+- `data/eleitores.csv`: `titulo,nome` (`1001` a `1010`)
+- `data/candidatos.csv`: `cargo,numero,nome` (`PRESIDENTE`: `10`, `20`, `30`; `DEPUTADO_FEDERAL`: `101`, `102`, `103`, `104`)
 
-O servidor lê `PORT` (padrão `8080`) e `URNA_DADOS_DIR` (padrão `data`). Os caminhos de carga podem ser alterados com `URNA_ELEITORES_CSV` e `URNA_CANDIDATOS_CSV`.
+## Regras principais
 
-## Preparar eleitores e candidatos
+- Ciclo de estados controlado por senha do mesário: `FECHADA`, `ABERTA` e `ENCERRADA`.
+- Identificação do eleitor pelo título com confirmação do nome antes de votar. Cada eleitor participa uma única vez (voto ou abstenção).
+- Cédula com 1 voto para Presidente e 2 votos para Deputado Federal (candidatos distintos quando nominais), aceitando voto nominal, `BRANCO` ou `NULO`.
+- Persistência atômica em `data/urna.db` sem vínculo entre o título do eleitor e as escolhas da cédula.
+- Boletim de Urna disponível após o encerramento, com percentual calculado sobre os votos válidos de cada cargo e desempate pelo menor número de candidato.
 
-Edite os CSVs antes da primeira execução, mantendo os cabeçalhos e os cargos aceitos:
-
-- `data/eleitores.csv`: `titulo,nome`
-- `data/candidatos.csv`: `cargo,numero,nome`; `cargo` é `PRESIDENTE` ou `DEPUTADO_FEDERAL`.
-
-Para iniciar uma eleição limpa e recarregar os CSVs, execute `docker compose down -v` e depois `docker compose up --build -d`. Isso apaga o volume Docker `dados-urna`, que contém o arquivo persistente da eleição. Faça backup do volume antes de apagá-lo se precisar conservar os resultados.
-
-## Regras implementadas
-
-- A urna passa por `FECHADA`, `ABERTA` e `ENCERRADA`; abertura, encerramento e apuração respeitam esses estados.
-- O eleitor se identifica pelo título. Um título inexistente é rejeitado. Não há confirmação de identidade pelo mesário.
-- O eleitor registra uma escolha para presidente e duas para deputado federal. Cada escolha pode ser nominal, branca ou nula. Número inválido é informado e precisa ser corrigido antes da confirmação.
-- A confirmação grava as três escolhas como uma cédula sem título, horário ou identificador de eleitor. A participação do eleitor fica em registro separado. Abstenções também são contadas sem guardar a escolha de voto.
-- O boletim fica disponível após o encerramento. Percentuais usam a soma de votos nominais válidos como denominador; se ela for zero, os percentuais são 0% e não há eleitos.
-- Em empate na última vaga, vence o menor número de candidato. Candidatos sem votos não são declarados eleitos.
-- O sistema mantém os dados em um único arquivo local e o substitui atomicamente após cada operação persistida.
-
-O `Dockerfile` e o `compose.yaml` são voltados à execução local. O modo atual é uma demonstração acadêmica e não foi projetado para uma eleição real.
-
-## Estrutura
+## Estrutura do projeto
 
 ```text
-src/main/java/br/ufmg/urna/          domínio da urna
-src/main/java/br/ufmg/urna/negocio/ regras de votação e apuração
-src/main/java/br/ufmg/urna/dados/   carga CSV e persistência local
-src/main/java/br/ufmg/urna/ui/      interface web e formulários
-src/test/java/                      testes automatizados JUnit 5
-data/                                dados fictícios para demonstração
+src/main/java/br/ufmg/urna/          domínio (records, enums e exceções)
+src/main/java/br/ufmg/urna/negocio/  regras de votação e apuração (ServicoUrna)
+src/main/java/br/ufmg/urna/dados/    leitura CSV e persistência atômica (RepositorioArquivo)
+src/main/java/br/ufmg/urna/ui/       servidor HTTP e interface da urna (ServidorHttp)
+src/test/java/br/ufmg/urna/          testes automatizados JUnit 5
+data/                                carga inicial de eleitores e candidatos
+docs/                                PDFs das Sprints, diagramas UML e especificação
 ```
 
-## Uso de ferramentas de IA
+## Branches
 
-O desenvolvimento contou com assistência do Codex para analisar as especificações, planejar a implementação, criar código e testes, e revisar documentação. Os integrantes do grupo devem revisar os artefatos e registrar esse uso na entrega, conforme as instruções da disciplina.
+- `dev`: desenvolvimento e execução local com Docker.
+- `main`: produção publicada no Render (`https://urna-eleitoral.onrender.com`).
+
+## Declaração de uso de IA
+
+Ferramentas de IA (Codex e Gemini) foram utilizadas como auxílio na análise de requisitos, implementação, geração de diagramas e testes JUnit 5, com revisão e validação integral pelos integrantes do grupo.
