@@ -69,7 +69,3 @@ docs/                                PDFs das Sprints, diagramas UML e especific
 
 - `dev`: desenvolvimento e execução local com Docker.
 - `main`: produção publicada no Render (`https://urna-eleitoral.onrender.com`).
-
-## Declaração de uso de IA
-
-Ferramentas de IA (Codex e Gemini) foram utilizadas como auxílio na análise de requisitos, implementação, geração de diagramas e testes JUnit 5, com revisão e validação integral pelos integrantes do grupo.
